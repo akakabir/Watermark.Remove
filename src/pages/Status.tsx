@@ -1,20 +1,25 @@
 import React, { useEffect, useState } from 'react';
 
-interface Service {
-  name: string;
-  status: string;
+interface StatusData {
   uptime: string;
+  memory: string;
+  cpuLoad: string;
+  services: {
+    name: string;
+    status: string;
+    uptime: string;
+  }[];
 }
 
 export default function Status() {
-  const [services, setServices] = useState<Service[]>([]);
+  const [data, setData] = useState<StatusData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/status')
       .then(r => r.json())
-      .then(data => {
-        setServices(data.services);
+      .then(d => {
+        setData(d);
         setLoading(false);
       });
   }, []);
@@ -25,26 +30,43 @@ export default function Status() {
         <h1 className="text-3xl font-bold mb-2">System Status</h1>
         <p className="text-gray-500 mb-8">Current operational status of all platform services.</p>
 
-        {loading ? (
+        {loading || !data ? (
           <div className="animate-pulse space-y-4">
             {[1, 2, 3, 4].map(i => (
               <div key={i} className="h-16 bg-gray-100 rounded-xl w-full"></div>
             ))}
           </div>
         ) : (
-          <div className="space-y-4">
-            {services.map(service => (
-              <div key={service.name} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors">
-                <div>
-                  <h3 className="font-semibold text-lg">{service.name}</h3>
-                  <p className="text-sm text-gray-500">Uptime: {service.uptime}</p>
-                </div>
-                <div className="flex items-center space-x-2 bg-green-50 px-3 py-1 rounded-full border border-green-100">
-                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                  <span className="text-xs font-bold text-green-700 uppercase tracking-wide">{service.status}</span>
-                </div>
+          <div className="space-y-8">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-center">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Server Uptime</p>
+                <p className="text-xl font-bold">{data.uptime}</p>
               </div>
-            ))}
+              <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-center">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Memory Usage</p>
+                <p className="text-xl font-bold">{data.memory}</p>
+              </div>
+              <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-center">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">CPU Load (1m)</p>
+                <p className="text-xl font-bold">{data.cpuLoad}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {data.services.map(service => (
+                <div key={service.name} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors">
+                  <div>
+                    <h3 className="font-semibold text-lg">{service.name}</h3>
+                    <p className="text-sm text-gray-500">Uptime: {service.uptime}</p>
+                  </div>
+                  <div className="flex items-center space-x-2 bg-green-50 px-3 py-1 rounded-full border border-green-100">
+                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                    <span className="text-xs font-bold text-green-700 uppercase tracking-wide">{service.status}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

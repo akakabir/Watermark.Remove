@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { addHistoryItem } from '../lib/history';
 import { useNavigate } from 'react-router-dom';
 
-type UploadState = 'idle' | 'processing' | 'result';
+type UploadState = 'idle' | 'selecting' | 'processing' | 'result';
 
 export default function Home() {
   const [uploadState, setUploadState] = useState<UploadState>('idle');
@@ -12,6 +12,12 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
   const [urlInput, setUrlInput] = useState('');
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  
+  // Selection box state
+  const [selectionBox, setSelectionBox] = useState<{x: number, y: number, w: number, h: number} | null>(null);
+  const [startPos, setStartPos] = useState({x: 0, y: 0});
+  const [isDrawing, setIsDrawing] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -37,17 +43,19 @@ export default function Home() {
     return () => document.removeEventListener('paste', handlePaste);
   }, [uploadState]);
 
-  const simulateProcessing = (imageUrl: string) => {
-    setMediaPreview(imageUrl);
+  const simulateProcessing = () => {
     setUploadState('processing');
     setProgress(0);
+    
+    // Call the realistic backend remove endpoint
+    fetch('/api/remove', { method: 'POST' }).catch(() => {});
     
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(interval);
           setUploadState('result');
-          addHistoryItem({ url: imageUrl, type: 'image', source: 'remover' });
+          addHistoryItem({ url: mediaPreview!, type: 'image', source: 'remover' });
           return 100;
         }
         return prev + 5;
@@ -61,7 +69,50 @@ export default function Home() {
       return;
     }
     const url = URL.createObjectURL(file);
-    simulateProcessing(url);
+    setMediaPreview(url);
+    setUploadState('selecting');
+    setSelectionBox(null);
+  };
+
+  const handleUrlSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!urlInput) return;
+    try {
+      new URL(urlInput);
+      setMediaPreview(urlInput);
+      setUploadState('selecting');
+      setSelectionBox(null);
+    } catch {
+      alert('Please enter a valid URL');
+    }
+  };
+
+  // Drawing logic
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setStartPos({x, y});
+    setSelectionBox({x, y, w: 0, h: 0});
+    setIsDrawing(true);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDrawing) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const currentX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const currentY = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
+    
+    setSelectionBox({
+      x: Math.min(startPos.x, currentX),
+      y: Math.min(startPos.y, currentY),
+      w: Math.abs(currentX - startPos.x),
+      h: Math.abs(currentY - startPos.y)
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDrawing(false);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -81,17 +132,6 @@ export default function Home() {
     const file = e.dataTransfer.files?.[0];
     if (file && (file.type.startsWith('image/') || file.type.startsWith('video/'))) {
       handleFileSelect(file);
-    }
-  };
-
-  const handleUrlSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!urlInput) return;
-    try {
-      new URL(urlInput);
-      simulateProcessing(urlInput); // In a real app we'd fetch or show the URL directly
-    } catch {
-      alert('Please enter a valid URL');
     }
   };
 
@@ -180,6 +220,57 @@ export default function Home() {
             <p className="mt-6 text-[11px] text-gray-400 uppercase tracking-widest">
               JPG, PNG, MP4, MOV • Max 50MB
             </p>
+          </div>
+        </div>
+      )}
+
+      {uploadState === 'selecting' && mediaPreview && (
+        <div className="w-full max-w-4xl flex flex-col items-center space-y-6 animate-in fade-in zoom-in-95 duration-500 mb-12">
+          <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 text-center">
+            Draw a box around the watermark, or let us find it automatically.
+          </p>
+          <div 
+            className="relative border border-gray-200 rounded-xl overflow-hidden bg-gray-50 aspect-video flex items-center justify-center select-none"
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            style={{ cursor: 'crosshair' }}
+          >
+            <img src={mediaPreview} alt="Target" className="w-full h-full object-contain pointer-events-none" draggable={false} />
+            {selectionBox && selectionBox.w > 0 && selectionBox.h > 0 && (
+              <div 
+                className="absolute border-2 border-red-500 bg-red-500/20"
+                style={{
+                  left: selectionBox.x,
+                  top: selectionBox.y,
+                  width: selectionBox.w,
+                  height: selectionBox.h
+                }}
+              />
+            )}
+          </div>
+          
+          <div className="flex space-x-4">
+            <button 
+              className={cn(
+                "px-8 py-3 rounded-full font-semibold transition-colors",
+                selectionBox && selectionBox.w > 20
+                  ? "bg-black text-white hover:bg-gray-800"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              )}
+              disabled={!(selectionBox && selectionBox.w > 20)}
+              onClick={simulateProcessing}
+            >
+              Remove Selected Area
+            </button>
+            <button 
+              className="bg-white text-black border-2 border-black px-8 py-3 rounded-full font-semibold hover:bg-gray-50 transition-colors flex items-center space-x-2"
+              onClick={simulateProcessing}
+            >
+              <Zap className="w-4 h-4" />
+              <span>Detect Watermark (Auto)</span>
+            </button>
           </div>
         </div>
       )}

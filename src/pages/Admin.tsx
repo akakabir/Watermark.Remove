@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 export default function Admin() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('admin_auth') === 'true');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -19,11 +19,17 @@ export default function Admin() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (username === 'watermark' && (password === 'removed_u_lol' || password === 'removed_u _lol')) {
+      localStorage.setItem('admin_auth', 'true');
       setIsAuthenticated(true);
       setError('');
     } else {
       setError('Invalid credentials');
     }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('admin_auth');
+    setIsAuthenticated(false);
   };
 
   if (!isAuthenticated) {
@@ -74,9 +80,17 @@ export default function Admin() {
   return (
     <main className="flex-1 flex flex-col p-8 bg-white overflow-y-auto">
       <div className="max-w-6xl mx-auto w-full space-y-12">
-        <div>
-           <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
-           <p className="text-gray-500 mt-1">System-wide processing metrics and user statistics.</p>
+        <div className="flex justify-between items-start">
+           <div>
+             <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+             <p className="text-gray-500 mt-1">System-wide processing metrics and user statistics.</p>
+           </div>
+           <button 
+             onClick={handleLogout}
+             className="px-4 py-2 border border-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+           >
+             Logout
+           </button>
         </div>
 
         {analytics ? (
