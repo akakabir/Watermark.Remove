@@ -1,0 +1,6 @@
+{
+  "name": "watermark.remove",
+  "description": "Remove watermarks instantly with our modern web application.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
